@@ -2,6 +2,7 @@ import json
 import os
 from dotenv import load_dotenv
 from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import ApplicationBuilder
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
     ContextTypes, filters
@@ -120,13 +121,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- Main --------------------------------------------------------------------
 def main():
-    app = Application.builder().token(BOT_TOKEN).build()
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Buyruqlar
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("list",  list_codes))     # /list komanda
-    # Matnli xabarlar
-    app.add_handler(MessageHandler(filters.TEXT, handle_message))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(button_handler))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
 from keep_alive import keep_alive  # faylni pastda beraman
 
