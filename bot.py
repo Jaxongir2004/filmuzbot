@@ -1,21 +1,22 @@
 # Kino Kod Bot - Aiogram 3
 # Telegram bot foydalanuvchidan kino kodini olib, yopiq kanaldan kino yuboradi.
-# Admin paneli orqali adminlar kino kodi va message ID ni bog'lay oladi.
+# Render.com Web Service orqali doimiy ishlashi uchun moslashtirilgan
 
 import json
-import logging
+import os
+import asyncio
+import threading
+from keep_alive import run  # Web server fon rejimda
+
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import Message
 from aiogram.enums import ParseMode
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import ReplyKeyboardRemove
+from aiogram.fsm.context import FSMContext
 from aiogram.filters import Command
 from aiogram import Router
-import asyncio
 
-API_TOKEN = '7801413763:AAEAtZS06L-7qR_hl3uYVDz7f0BsWnbrkAM'  # <-- o'zgartiring
+API_TOKEN = os.getenv("7801413763:AAEAtZS06L-7qR_hl3uYVDz7f0BsWnbrkAM")  # Tokenni Render environmentdan oladi
 ADMINS = [7784829606]  # <-- o'zgartiring
 DATA_FILE = 'kino_data.json'
 
@@ -47,12 +48,12 @@ def save_data(data):
 
 # ------ START ------ #
 @router.message(Command("start"))
-async def cmd_start(message: Message, state: FSMContext):
+async def cmd_start(message: types.Message, state: FSMContext):
     await message.answer("Assalomu alaykum! Iltimos, kino kodini kiriting:")
     await state.set_state(CodeState.waiting_for_code)
 
 @router.message(CodeState.waiting_for_code)
-async def handle_code(message: Message, state: FSMContext):
+async def handle_code(message: types.Message, state: FSMContext):
     code = message.text.strip()
     data = load_data()
     if code in data:
@@ -67,32 +68,32 @@ async def handle_code(message: Message, state: FSMContext):
 
 # ------ ADMIN PANEL ------ #
 @router.message(Command("admin"))
-async def admin_panel(message: Message):
+async def admin_panel(message: types.Message):
     if message.from_user.id in ADMINS:
         await message.answer("Admin paneliga xush kelibsiz:\n/kod_qoshish - yangi kod qo‘shish\n/kodlar - barcha kodlar ro‘yxati")
     else:
         await message.answer("Siz admin emassiz.")
 
 @router.message(Command("kod_qoshish"))
-async def add_kod_start(message: Message, state: FSMContext):
+async def add_kod_start(message: types.Message, state: FSMContext):
     if message.from_user.id in ADMINS:
         await message.answer("Yangi kino kodi kiriting:")
         await state.set_state(AddKinoState.waiting_for_code)
 
 @router.message(AddKinoState.waiting_for_code)
-async def add_code_step(message: Message, state: FSMContext):
+async def add_code_step(message: types.Message, state: FSMContext):
     await state.update_data(code=message.text.strip())
     await message.answer("Kino joylashgan kanal ID sini kiriting (masalan: -1001234567890):")
     await state.set_state(AddKinoState.waiting_for_channel)
 
 @router.message(AddKinoState.waiting_for_channel)
-async def add_channel_step(message: Message, state: FSMContext):
+async def add_channel_step(message: types.Message, state: FSMContext):
     await state.update_data(channel_id=message.text.strip())
     await message.answer("Kino joylashgan message ID sini kiriting:")
     await state.set_state(AddKinoState.waiting_for_message_id)
 
 @router.message(AddKinoState.waiting_for_message_id)
-async def add_message_id_step(message: Message, state: FSMContext):
+async def add_message_id_step(message: types.Message, state: FSMContext):
     data = await state.get_data()
     code = data['code']
     channel_id = data['channel_id']
@@ -105,11 +106,11 @@ async def add_message_id_step(message: Message, state: FSMContext):
     }
     save_data(db)
 
-    await message.answer(f"✅ Kod '{code}' muvaffaqiyatli qo‘shildi!", reply_markup=ReplyKeyboardRemove())
+    await message.answer(f"✅ Kod '{code}' muvaffaqiyatli qo‘shildi!")
     await state.clear()
 
 @router.message(Command("kodlar"))
-async def list_kodlar(message: Message):
+async def list_kodlar(message: types.Message):
     if message.from_user.id in ADMINS:
         data = load_data()
         if not data:
@@ -122,8 +123,8 @@ async def list_kodlar(message: Message):
 
 # ------ MAIN ------ #
 async def main():
-    logging.basicConfig(level=logging.INFO)
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
+    threading.Thread(target=run).start()  # HTTP server ishga tushadi (port 8080)
     asyncio.run(main())
